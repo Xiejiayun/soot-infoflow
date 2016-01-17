@@ -295,13 +295,16 @@ public class IFDSSolver<N,D extends FastSolverLinkedNode<D, N>,M,I extends BiDiI
 							FlowFunction<D> retFunction = flowFunctions.getReturnFlowFunction(n, sCalledProcN, eP, retSiteN);
 							//for each target value of the function
 							for(D d5: computeReturnFlowFunction(retFunction, d3, d4, n, Collections.singleton(d1))) {
+								if (memoryManager != null)
+									d5 = memoryManager.handleGeneratedMemoryObject(d4, d5);
+								
 								// If we have not changed anything in the callee, we do not need the facts
 								// from there. Even if we change something: If we don't need the concrete
 								// path, we can skip the callee in the predecessor chain
 								D d5p = d5;
 								if (d5.equals(d2))
 									d5p = d2;
-								else if (setJumpPredecessors)
+								else if (setJumpPredecessors && d5p != d3)
 									d5p.setPredecessor(d3);
 								propagate(d1, retSiteN, d5p, n, false, true);
 							}
@@ -401,7 +404,7 @@ public class IFDSSolver<N,D extends FastSolverLinkedNode<D, N>,M,I extends BiDiI
 							D d5p = d5;
 							if (d5.equals(predVal))
 								d5p = predVal;
-							else if (setJumpPredecessors)
+							else if (setJumpPredecessors && d5p != d1)
 								d5p.setPredecessor(d1);
 							propagate(d4, retSiteC, d5p, c, false, true);
 						}
@@ -577,8 +580,26 @@ public class IFDSSolver<N,D extends FastSolverLinkedNode<D, N>,M,I extends BiDiI
 		
 		Set<Pair<N, D>> summaries = endSummary.putIfAbsentElseGet
 				(new Pair<M, D>(m, d1), new ConcurrentHashSet<Pair<N, D>>());
-		return summaries.add(new Pair<N, D>(eP, d2));
-	}	
+		boolean res = summaries.add(new Pair<N, D>(eP, d2));
+		
+		/*
+		if (res) {
+			Map<M, Integer> countMap = new HashMap<M, Integer>();
+			for (Pair<M, D> pair : endSummary.keySet()) {
+				if (countMap.containsKey(pair.getO1()))
+					countMap.put(pair.getO1(), countMap.get(pair.getO1()) + 1);
+				else
+					countMap.put(pair.getO1(), 1);
+				
+				if (countMap.get(pair.getO1()) > 10) {
+					System.out.println(pair.getO1());
+				}
+			}
+		}
+		*/
+		
+		return res;
+	}
 	
 	protected Map<N, Map<D, D>> incoming(D d1, M m) {
 		Map<N, Map<D, D>> map = incoming.get(new Pair<M, D>(m, d1));
@@ -690,6 +711,14 @@ public class IFDSSolver<N,D extends FastSolverLinkedNode<D, N>,M,I extends BiDiI
 	 */
 	public void setMemoryManager(IMemoryManager<D> memoryManager) {
 		this.memoryManager = memoryManager;
+	}
+	
+	/**
+	 * Gets the memory manager used by this solver to reduce memory consumption
+	 * @return The memory manager registered with this solver
+	 */	
+	public IMemoryManager<D> getMemoryManager() {
+		return this.memoryManager;
 	}
 
 }

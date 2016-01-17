@@ -44,6 +44,7 @@ import soot.jimple.infoflow.data.Abstraction;
 import soot.jimple.infoflow.data.AbstractionAtSink;
 import soot.jimple.infoflow.data.AccessPathFactory;
 import soot.jimple.infoflow.data.FlowDroidMemoryManager;
+import soot.jimple.infoflow.data.FlowDroidMemoryManager.PathDataErasureMode;
 import soot.jimple.infoflow.data.pathBuilders.DefaultPathBuilderFactory;
 import soot.jimple.infoflow.data.pathBuilders.IAbstractionPathBuilder;
 import soot.jimple.infoflow.data.pathBuilders.IPathBuilderFactory;
@@ -80,6 +81,9 @@ public class Infoflow extends AbstractInfoflow {
     private TaintPropagationHandler backwardsPropagationHandler = null;
     
     private long maxMemoryConsumption = -1;
+    
+    private Set<Stmt> collectedSources = null;
+    private Set<Stmt> collectedSinks = null;
 
 	/**
 	 * Creates a new instance of the InfoFlow class for analyzing plain Java code without any references to APKs or the Android SDK.
@@ -115,7 +119,8 @@ public class Infoflow extends AbstractInfoflow {
 	public Infoflow(String androidPath, boolean forceAndroidJar, BiDirICFGFactory icfgFactory,
 			IPathBuilderFactory pathBuilderFactory) {
 		super(icfgFactory, androidPath, forceAndroidJar);
-		this.pathBuilderFactory = pathBuilderFactory;
+		this.pathBuilderFactory = pathBuilderFactory == null ? new DefaultPathBuilderFactory()
+				: pathBuilderFactory;
 	}
 	
 	@Override
@@ -223,7 +228,13 @@ public class Infoflow extends AbstractInfoflow {
 		CountingThreadPoolExecutor executor = createExecutor(numThreads);
 		
 		// Initialize the memory manager
-		IMemoryManager<Abstraction> memoryManager = new FlowDroidMemoryManager();
+		PathDataErasureMode erasureMode = PathDataErasureMode.EraseAll;
+		if (pathBuilderFactory.isContextSensitive())
+			erasureMode = PathDataErasureMode.KeepOnlyContextData;
+		if (pathBuilderFactory.supportsPathReconstruction())
+			erasureMode = PathDataErasureMode.EraseNothing;
+		IMemoryManager<Abstraction> memoryManager = new FlowDroidMemoryManager(false,
+				erasureMode);
 		
 		// Initialize the data flow manager
 		InfoflowManager manager = new InfoflowManager(config, null, iCfg, sourcesSinks,
@@ -366,7 +377,8 @@ public class Infoflow extends AbstractInfoflow {
 			for (AbstractionAtSink checkAbs : res)
 				if (checkAbs != curAbs
 						&& checkAbs.getSinkStmt() == curAbs.getSinkStmt()
-						&& checkAbs.getAbstraction().isImplicit() == curAbs.getAbstraction().isImplicit())
+						&& checkAbs.getAbstraction().isImplicit() == curAbs.getAbstraction().isImplicit()
+						&& checkAbs.getAbstraction().getSourceContext() == curAbs.getAbstraction().getSourceContext())
 					if (checkAbs.getAbstraction().getAccessPath().entails(
 							curAbs.getAbstraction().getAccessPath())) {
 						absAtSinkIt.remove();
@@ -517,6 +529,11 @@ public class Infoflow extends AbstractInfoflow {
 			final ISourceSinkManager sourcesSinks,
 			InfoflowProblem forwardProblem,
 			SootMethod m) {
+		if (getConfig().getLogSourcesAndSinks() && collectedSources == null) {
+			collectedSources = new HashSet<>();
+			collectedSinks = new HashSet<>();
+		}
+		
 		int sinkCount = 0;
 		if (m.hasActiveBody()) {
 			// Check whether this is a system class we need to ignore
@@ -533,11 +550,15 @@ public class Infoflow extends AbstractInfoflow {
 				Stmt s = (Stmt) u;
 				if (sourcesSinks.getSourceInfo(s, iCfg) != null) {
 					forwardProblem.addInitialSeeds(u, Collections.singleton(forwardProblem.zeroValue()));
+					if (getConfig().getLogSourcesAndSinks())
+						collectedSources.add(s);
 					logger.debug("Source found: {}", u);
 				}
 				if (sourcesSinks.isSink(s, iCfg, null)) {
-		            logger.debug("Sink found: {}", u);
 					sinkCount++;
+					if (getConfig().getLogSourcesAndSinks())
+						collectedSinks.add(s);
+					logger.debug("Sink found: {}", u);
 				}
 			}
 			
@@ -599,4 +620,26 @@ public class Infoflow extends AbstractInfoflow {
 		return this.maxMemoryConsumption;
 	}
 	
+	/**
+	 * Gets the concrete set of sources that have been collected in preparation
+	 * for the taint analysis. This method will return null if source and sink
+	 * logging has not been enabled (see InfoflowConfiguration.
+	 * setLogSourcesAndSinks()),
+	 * @return The set of sources collected for taint analysis
+	 */
+	public Set<Stmt> getCollectedSources() {
+		return this.collectedSources;
+	}
+	
+	/**
+	 * Gets the concrete set of sinks that have been collected in preparation
+	 * for the taint analysis. This method will return null if source and sink
+	 * logging has not been enabled (see InfoflowConfiguration.
+	 * setLogSourcesAndSinks()),
+	 * @return The set of sinks collected for taint analysis
+	 */
+	public Set<Stmt> getCollectedSinks() {
+		return this.collectedSinks;
+	}
+
 }

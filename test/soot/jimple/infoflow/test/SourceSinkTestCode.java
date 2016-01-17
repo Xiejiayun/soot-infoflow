@@ -32,6 +32,10 @@ public class SourceSinkTestCode {
 			return data2;
 		}
 		
+		public String getSecret() {
+			return "Secret";
+		}
+		
 	}
 	
 	private class B extends Base {
@@ -70,19 +74,19 @@ public class SourceSinkTestCode {
 		cm.publish(a.getData2());
 	}
 	
-	private void doLeakSecret2(A a) {
-		System.out.println(a.data2);
+	private void doLeakSecret(String s) {
+		System.out.println(s);
 	}
 	
 	public void testSinkAccessPaths() {
 		A a = getSecret();
-		doLeakSecret2(a);
+		doLeakSecret(a.data);
 	}
 	
 	public void testSinkAccessPaths2() {
 		A a = getSecret();
 		a.data2 = a.data;
-		doLeakSecret2(a);
+		doLeakSecret(a.data2);
 	}
 
 	public void ifAsSinkTest() {
@@ -91,6 +95,12 @@ public class SourceSinkTestCode {
 			System.out.println("Greater");
 		else
 			System.out.println("Smaller");
+	}
+	
+	public void sourceToSourceTest() {
+		A a = getSecret();
+		String s = a.getSecret();
+		doLeakSecret(s);
 	}
 	
 }

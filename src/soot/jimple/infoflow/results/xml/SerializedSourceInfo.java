@@ -14,8 +14,15 @@ public class SerializedSourceInfo extends AbstractSerializedSourceSink {
 	
 	private List<SerializedPathElement> propagationPath = null;
 	
-	SerializedSourceInfo(SerializedAccessPath accessPath, String statement) {
-		super(accessPath, statement);
+	SerializedSourceInfo(SerializedAccessPath accessPath, String statement,
+			String method) {
+		this(accessPath, statement, method, null);
+	}
+	
+	SerializedSourceInfo(SerializedAccessPath accessPath, String statement,
+			String method, List<SerializedPathElement> propagationPath) {
+		super(accessPath, statement, method);
+		this.propagationPath = propagationPath;
 	}
 	
 	/**

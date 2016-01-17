@@ -1,8 +1,13 @@
 package soot.jimple.infoflow.data;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import soot.jimple.infoflow.solver.IMemoryManager;
 
@@ -14,7 +19,9 @@ import soot.jimple.infoflow.solver.IMemoryManager;
  */
 public class FlowDroidMemoryManager implements IMemoryManager<Abstraction> {
 	
-	/**
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+    
+    /**
 	 * Special class for encapsulating taint abstractions for a full equality
 	 * check including those fields (predecessor, etc.) that are normally left
 	 * out
@@ -70,21 +77,52 @@ public class FlowDroidMemoryManager implements IMemoryManager<Abstraction> {
 	private AtomicInteger reuseCounter = new AtomicInteger();
 	
 	private final boolean tracingEnabled;
+	private final PathDataErasureMode erasePathData;
 	private boolean useAbstractionCache = false;
+	
+	/**
+	 * Supported modes that define which path tracking data shall be erased and
+	 * which shall be kept
+	 */
+	public enum PathDataErasureMode {
+		/**
+		 * Keep all path tracking data.
+		 */
+		EraseNothing,
+		/**
+		 * Keep only those path tracking items that are necessary for context-
+		 * sensitive path reconstruction.
+		 */
+		KeepOnlyContextData,
+		/**
+		 * Erase all path tracking data.
+		 */
+		EraseAll
+	}
 	
 	/**
 	 * Constructs a new instance of the AccessPathManager class
 	 */
 	public FlowDroidMemoryManager() {
-		this(false);
+		this(false, PathDataErasureMode.EraseNothing);
 	}
 	
 	/**
 	 * Constructs a new instance of the AccessPathManager class
 	 * @param tracingEnabled True if performance tracing data shall be recorded
+	 * @param erasePathData Specifies whether data for tracking paths (current
+	 * statement, corresponding call site) shall be erased.
 	 */	
-	public FlowDroidMemoryManager(boolean tracingEnabled) {
+	public FlowDroidMemoryManager(boolean tracingEnabled,
+			PathDataErasureMode erasePathData) {
 		this.tracingEnabled = tracingEnabled;
+		this.erasePathData = erasePathData;
+		
+		logger.info("Initializing FlowDroid memory manager...");
+		if (this.tracingEnabled)
+			logger.info("FDMM: Tracing enabled. This may negatively affect performance.");
+		if (this.erasePathData != PathDataErasureMode.EraseNothing)
+			logger.info("FDMM: Path data erasure enabled");
 	}
 	
 	/**
@@ -138,6 +176,49 @@ public class FlowDroidMemoryManager implements IMemoryManager<Abstraction> {
 		// We check for a cached version of the access path
 		AccessPath newAP = getCachedAccessPath(obj.getAccessPath());
 		obj.setAccessPath(newAP);
+		
+		// If the abstraction just made a pass through the alias analysis
+		// without any changes, we can throw away the middle men.
+		// More precisely: Compact a -> r0 -> _r0 -> r0 to a -> r0.
+		Abstraction pred = obj.getPredecessor();
+		if (obj.isAbstractionActive()) {
+			Set<Abstraction> doneSet = new HashSet<>();
+			Abstraction curAbs = pred;
+			while (curAbs != null && !curAbs.isAbstractionActive() && doneSet.add(curAbs)) {
+				Abstraction predPred = curAbs.getPredecessor();
+				if (predPred != null && predPred.isAbstractionActive()) {
+					if (predPred.equals(obj)) {
+						pred = predPred.getPredecessor();
+						obj = predPred;
+					}
+				}
+				else
+					break;
+				curAbs = predPred;
+			}
+		}
+		
+		// Erase path data if requested
+		Abstraction curAbs = obj;
+		while (curAbs != null) {
+			boolean doErase = erasePathData == PathDataErasureMode.EraseAll;
+			if (erasePathData == PathDataErasureMode.KeepOnlyContextData
+					&& curAbs.getCorrespondingCallSite() == curAbs.getCurrentStmt())
+				doErase = true;
+			if (erasePathData == PathDataErasureMode.KeepOnlyContextData
+					&& curAbs.getCorrespondingCallSite() == null
+					&& curAbs.getCurrentStmt() != null 
+					&& !curAbs.getCurrentStmt().containsInvokeExpr()) {
+				doErase = true;
+			}
+			if (doErase) {
+				curAbs.setCurrentStmt(null);
+				curAbs.setCorrespondingCallSite(null);
+				curAbs = curAbs.getPredecessor();
+			}
+			else
+				break;
+		}		
 		return obj;
 	}
 
@@ -145,8 +226,9 @@ public class FlowDroidMemoryManager implements IMemoryManager<Abstraction> {
 	public Abstraction handleGeneratedMemoryObject(Abstraction input,
 			Abstraction output) {
 		// We we just pass the same object on, there is nothing to optimize
-		if (input == output)
+		if (input == output) {
 			return output;
+		}
 		
 		// If the flow function gave us a chain of abstractions, we can
 		// compact it

@@ -575,6 +575,7 @@ public class Abstraction implements Cloneable, FastSolverLinkedNode<Abstraction,
 	@Override
 	public void setPredecessor(Abstraction predecessor) {
 		this.predecessor = predecessor;
+		assert this.predecessor != this;
 	}
 	
 	/**
@@ -594,9 +595,6 @@ public class Abstraction implements Cloneable, FastSolverLinkedNode<Abstraction,
 	 * registered before, otherwise false
 	 */
 	public boolean registerPathFlag(int id, int maxSize) {
-		if (pathFlags != null && id < pathFlags.size() && pathFlags.get(id))
-			return false;
-		
 		if (pathFlags == null) {
 			synchronized (this) {
 				if (pathFlags == null) {
