@@ -132,10 +132,12 @@ public class Infoflow extends AbstractInfoflow {
 			return;
 		}
 		
+		//初始化soot
 		initializeSoot(appPath, libPath, entryPointCreator.getRequiredClasses());
 
 		// entryPoints are the entryPoints required by Soot to calculate Graph - if there is no main method,
 		// we have to create a new main method and use it as entryPoint and store our real entryPoints
+		//BaseEntryCreator
 		Scene.v().setEntryPoints(Collections.singletonList(entryPointCreator.createDummyMain()));
 		
 		// Run the analysis
@@ -192,7 +194,7 @@ public class Infoflow extends AbstractInfoflow {
 	 * @param additionalSeeds Additional seeds at which to create A ZERO fact
 	 * even if they are not sources
 	 */
-	private void runAnalysis(final ISourceSinkManager sourcesSinks, final Set<String> additionalSeeds) {
+	public void runAnalysis(final ISourceSinkManager sourcesSinks, final Set<String> additionalSeeds) {
 		// Clear the data from previous runs
 		maxMemoryConsumption = -1;
 		results = null;
@@ -210,7 +212,7 @@ public class Infoflow extends AbstractInfoflow {
 		
 		// Build the callgraph
 		constructCallgraph();
-		
+		//sourcesSinks也是至关重要的一个参数，里面包含了源，沉淀点回调方法
         // Perform constant propagation and remove dead code
         if (config.getCodeEliminationMode() != CodeEliminationMode.NoCodeElimination) {
 			long currentMillis = System.nanoTime();
@@ -239,9 +241,12 @@ public class Infoflow extends AbstractInfoflow {
 		// Initialize the data flow manager
 		InfoflowManager manager = new InfoflowManager(config, null, iCfg, sourcesSinks,
 				taintWrapper);
-		
+
+		//向后问题
 		BackwardsInfoflowProblem backProblem = null;
+		//向后管理
 		InfoflowManager backwardsManager = null;
+		//向后解决
 		InfoflowSolver backSolver = null;
 		final IAliasingStrategy aliasingStrategy;
 		switch (getConfig().getAliasingAlgorithm()) {
@@ -306,10 +311,11 @@ public class Infoflow extends AbstractInfoflow {
 		// which are then taken as seeds.
 		int sinkCount = 0;
         logger.info("Looking for sources and sinks...");
-        
+		//下面这段代码是自己添加的
+        Collection<SootMethod> sootMethods = getMethodsForSeeds(iCfg);
         for (SootMethod sm : getMethodsForSeeds(iCfg))
 			sinkCount += scanMethodForSourcesSinks(sourcesSinks, forwardProblem, sm);
-        
+
 		// We optionally also allow additional seeds to be specified
 		if (additionalSeeds != null)
 			for (String meth : additionalSeeds) {
@@ -321,7 +327,7 @@ public class Infoflow extends AbstractInfoflow {
 				forwardProblem.addInitialSeeds(m.getActiveBody().getUnits().getFirst(),
 						Collections.singleton(forwardProblem.zeroValue()));
 			}
-		
+
 		// Report on the sources and sinks we have found
 		if (!forwardProblem.hasInitialSeeds()) {
 			logger.error("No sources found, aborting analysis");
@@ -480,10 +486,16 @@ public class Infoflow extends AbstractInfoflow {
     	builder.shutdown();
 	}
 
-	private Collection<SootMethod> getMethodsForSeeds(IInfoflowCFG icfg) {
+	/**
+	 * 这个方法能够获取从入口点出发的所有的方法，这样的话我也可以进行相应的分析。还算比较有用的
+	 * @param icfg
+	 * @return
+     */
+	public Collection<SootMethod> getMethodsForSeeds(IInfoflowCFG icfg) {
 		List<SootMethod> seeds = new LinkedList<SootMethod>();
 		// If we have a callgraph, we retrieve the reachable methods. Otherwise,
 		// we have no choice but take all application methods as an approximation
+		//如果有系统调用图，那么久提取出所有可到达的方法
 		if (Scene.v().hasCallGraph()) {
 			List<MethodOrMethodContext> eps = new ArrayList<MethodOrMethodContext>(Scene.v().getEntryPoints());
 			ReachableMethods reachableMethods = new ReachableMethods(Scene.v().getCallGraph(), eps.iterator(), null);
@@ -501,7 +513,7 @@ public class Infoflow extends AbstractInfoflow {
 		return seeds;
 	}
 
-	private void getMethodsForSeedsIncremental(SootMethod sm,
+	public void getMethodsForSeedsIncremental(SootMethod sm,
 			Set<SootMethod> doneSet, List<SootMethod> seeds, IInfoflowCFG icfg) {
 		assert Scene.v().hasFastHierarchy();
 		if (!sm.isConcrete() || !sm.getDeclaringClass().isApplicationClass() || !doneSet.add(sm))
@@ -525,7 +537,7 @@ public class Infoflow extends AbstractInfoflow {
 	 * @param m The method to scan for sources and sinks
 	 * @return The number of sinks found in this method
 	 */
-	private int scanMethodForSourcesSinks(
+	public int scanMethodForSourcesSinks(
 			final ISourceSinkManager sourcesSinks,
 			InfoflowProblem forwardProblem,
 			SootMethod m) {
@@ -549,16 +561,20 @@ public class Infoflow extends AbstractInfoflow {
 			for (Unit u : units) {
 				Stmt s = (Stmt) u;
 				if (sourcesSinks.getSourceInfo(s, iCfg) != null) {
-					forwardProblem.addInitialSeeds(u, Collections.singleton(forwardProblem.zeroValue()));
-					if (getConfig().getLogSourcesAndSinks())
-						collectedSources.add(s);
-					logger.debug("Source found: {}", u);
+					//TODO这句话是我自己加的
+					if (s.containsInvokeExpr()) {
+						forwardProblem.addInitialSeeds(u, Collections.singleton(forwardProblem.zeroValue()));
+						if (getConfig().getLogSourcesAndSinks())
+							collectedSources.add(s);
+						logger.info("Source found: {}", u);
+					}
+
 				}
 				if (sourcesSinks.isSink(s, iCfg, null)) {
 					sinkCount++;
 					if (getConfig().getLogSourcesAndSinks())
 						collectedSinks.add(s);
-					logger.debug("Sink found: {}", u);
+					logger.info("Sink found: {}", u);
 				}
 			}
 			
