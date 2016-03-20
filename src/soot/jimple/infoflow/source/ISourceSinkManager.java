@@ -29,7 +29,6 @@ public interface ISourceSinkManager {
 	 * is a source, otherwise null
 	 */
 	public SourceInfo getSourceInfo(Stmt sCallSite, InterproceduralCFG<Unit, SootMethod> cfg);
-	
 	/**
 	 * Checks if the given access path at this statement will leak.
 	 * @param sCallSite The call site to check
@@ -40,5 +39,4 @@ public interface ISourceSinkManager {
 	 * if this method is not a sink
 	 */
 	boolean isSink(Stmt sCallSite, InterproceduralCFG<Unit, SootMethod> cfg, AccessPath ap);
-
 }

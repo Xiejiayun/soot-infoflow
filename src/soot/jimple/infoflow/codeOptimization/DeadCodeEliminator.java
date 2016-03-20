@@ -105,14 +105,14 @@ public class DeadCodeEliminator implements ICodeOptimizer {
 						Scene.v().getCallGraph().removeAllEdgesOutOf(u);
 		}
 	}
-	
+
 	/**
 	 * Gets a list of all units that invoke other methods in the given method
 	 * @param method The method from which to get all invocations
 	 * @return The list of units calling other methods in the given method if
 	 * there is at least one such unit. Otherwise null.
 	 */
-	private List<Unit> getCallsInMethod(SootMethod method) {
+	public List<Unit> getCallsInMethod(SootMethod method) {
 		List<Unit> callSites = null;
 		for (Unit u : method.getActiveBody().getUnits())
 			if (((Stmt) u).containsInvokeExpr()) {

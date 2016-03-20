@@ -22,11 +22,11 @@ public class InfoflowManager {
 	private final ITaintPropagationWrapper taintWrapper;
 	private final TypeUtils typeUtils;
 	
-	InfoflowManager(InfoflowConfiguration config,
-			IInfoflowSolver forwardSolver,
-			IInfoflowCFG icfg,
-			ISourceSinkManager sourceSinkManager,
-			ITaintPropagationWrapper taintWrapper) {
+	public InfoflowManager(InfoflowConfiguration config,
+						   IInfoflowSolver forwardSolver,
+						   IInfoflowCFG icfg,
+						   ISourceSinkManager sourceSinkManager,
+						   ITaintPropagationWrapper taintWrapper) {
 		this.config = config;
 		this.forwardSolver = forwardSolver;
 		this.icfg = icfg;

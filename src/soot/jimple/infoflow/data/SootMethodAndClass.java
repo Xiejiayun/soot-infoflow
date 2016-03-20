@@ -41,7 +41,7 @@ public class SootMethodAndClass {
 		this.className = sm.getDeclaringClass().getName();
 		this.returnType = sm.getReturnType().toString();
 		this.parameters = new ArrayList<String>();
-		for (Type p: sm.getParameterTypes())
+		for (Object p: sm.getParameterTypes())
 			this.parameters.add(p.toString());
 	}
 	

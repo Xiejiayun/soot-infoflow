@@ -69,9 +69,9 @@ public class EasyTaintWrapper extends AbstractTaintWrapper implements Cloneable 
 				public MethodWrapType load(SootMethod arg0) throws Exception {
 					return getMethodWrapType(arg0.getSubSignature(), arg0.getDeclaringClass());
 				}
-				
+
 			});
-	
+
 	private boolean aggressiveMode = false;
 	private boolean alwaysModelEqualsHashCode = true;
 	

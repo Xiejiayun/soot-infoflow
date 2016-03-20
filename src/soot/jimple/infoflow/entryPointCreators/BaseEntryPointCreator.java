@@ -69,7 +69,6 @@ public abstract class BaseEntryPointCreator implements IEntryPointCreator {
 	private boolean substituteCallParams = false;
 	private List<String> substituteClasses;
 	private boolean allowSelfReferences = false;
-
 	private final Set<SootMethod> failedMethods = new HashSet<>();
 	
 	protected String dummyClassName = "dummyMainClass";
@@ -158,13 +157,13 @@ public abstract class BaseEntryPointCreator implements IEntryPointCreator {
 		body.setMethod(mainMethod);
 		mainMethod.setActiveBody(body);
 		mainClass.addMethod(mainMethod);
-		
+
 		// Add a parameter reference to the body
 		LocalGenerator lg = new LocalGenerator(body);
 		Local paramLocal = lg.generateLocal(stringArrayType);
 		body.getUnits().addFirst(Jimple.v().newIdentityStmt(paramLocal,
 				Jimple.v().newParameterRef(stringArrayType, 0)));
-		
+
 		// First add class to scene, then make it an application class
 		// as addClass contains a call to "setLibraryClass" 
 		mainClass.setApplicationClass();

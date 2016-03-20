@@ -157,7 +157,6 @@ public abstract class AbstractInfoflow implements IInfoflow {
 	 * @param libPath The Soot classpath containing the libraries
 	 * @param classes The set of classes that shall be checked for data flow
 	 * analysis seeds. All sources in these classes are used as seeds.
-	 * @param sourcesSinks The manager object for identifying sources and sinks
 	 */
 	protected void initializeSoot(String appPath, String libPath, Collection<String> classes) {
 		initializeSoot(appPath, libPath, classes,  "");
@@ -176,7 +175,7 @@ public abstract class AbstractInfoflow implements IInfoflow {
 		// reset Soot:
 		logger.info("Resetting Soot...");
 		soot.G.reset();
-				
+		Options.v().set_keep_line_number(true);
 		Options.v().set_no_bodies_for_excluded(true);
 		Options.v().set_allow_phantom_refs(true);
 		if (logger.isDebugEnabled())
@@ -250,28 +249,28 @@ public abstract class AbstractInfoflow implements IInfoflow {
 				soot.options.Options.v().set_force_android_jar(this.androidPath);
 			else
 				soot.options.Options.v().set_android_jars(this.androidPath);
-		} else
+	} else
 			Options.v().set_src_prec(Options.src_prec_java);
-		
-		//at the end of setting: load user settings:
-		if (sootConfig != null)
+
+	//at the end of setting: load user settings:
+	if (sootConfig != null)
 			sootConfig.setSootOptions(Options.v());
-		
-		// load all entryPoint classes with their bodies
-		for (String className : classes)
+
+	// load all entryPoint classes with their bodies
+	for (String className : classes)
 			Scene.v().addBasicClass(className, SootClass.BODIES);
-		Scene.v().loadNecessaryClasses();
-		logger.info("Basic class loading done.");
-		
-		boolean hasClasses = false;
-		for (String className : classes) {
-			SootClass c = Scene.v().forceResolve(className, SootClass.BODIES);
-			if (c != null){
-				c.setApplicationClass();
-				if(!c.isPhantomClass() && !c.isPhantom())
-					hasClasses = true;
-			}
+	Scene.v().loadNecessaryClasses();
+	logger.info("Basic class loading done.");
+
+	boolean hasClasses = false;
+	for (String className : classes) {
+		SootClass c = Scene.v().forceResolve(className, SootClass.BODIES);
+		if (c != null){
+			c.setApplicationClass();
+			if(!c.isPhantomClass() && !c.isPhantom())
+				hasClasses = true;
 		}
+	}
 		if (!hasClasses) {
 			logger.error("Only phantom classes loaded, skipping analysis...");
 			return;
@@ -297,6 +296,7 @@ public abstract class AbstractInfoflow implements IInfoflow {
 	 * Constructs the callgraph
 	 */
 	protected void constructCallgraph() {
+		Scene scene = Scene.v();
 		// Allow the ICC manager to change the Soot Scene before we continue
 		ipcManager.updateJimpleForICC();
 
@@ -324,6 +324,7 @@ public abstract class AbstractInfoflow implements IInfoflow {
 	        PackManager.v().getPack("wjpp").apply();
 	        PackManager.v().getPack("cg").apply();
 		}
+
 		
 		// Run the preprocessors
         for (PreAnalysisHandler tr : preProcessors)

@@ -204,6 +204,7 @@ public class AndroidEntryPointCreator extends BaseEntryPointCreator implements I
 		// If we have an application, we need to start it in the very beginning
 		for (Entry<String, Set<String>> entry : classMap.entrySet()) {
 			SootClass currentClass = Scene.v().getSootClass(entry.getKey());
+			//这边是继承的所有的类都可以通过这个方法获得
 			List<SootClass> extendedClasses = Scene.v().getActiveHierarchy().getSuperclassesOf(currentClass);
 			for(SootClass sc : extendedClasses)
 				if(sc.getName().equals(AndroidEntryPointConstants.APPLICATIONCLASS)) {
@@ -257,8 +258,9 @@ public class AndroidEntryPointCreator extends BaseEntryPointCreator implements I
 		//prepare outer loop:
 		JNopStmt outerStartStmt = new JNopStmt();
 		body.getUnits().add(outerStartStmt);
-		
+		int entryCount = 0;
 		for(Entry<String, Set<String>> entry : classMap.entrySet()){
+			logger.error("Error "+(entryCount++));
 			//no execution order given for all apps:
 			JNopStmt entryExitStmt = new JNopStmt();
 			createIfStmt(entryExitStmt);
@@ -748,6 +750,7 @@ public class AndroidEntryPointCreator extends BaseEntryPointCreator implements I
 		}
 		
 		//2. onStart:
+		logger.debug("onStart");
 		Stmt onStartStmt = new JNopStmt();
 		body.getUnits().add(onStartStmt);
 		{
@@ -762,6 +765,7 @@ public class AndroidEntryPointCreator extends BaseEntryPointCreator implements I
 		searchAndBuildMethod(AndroidEntryPointConstants.ACTIVITY_ONPOSTCREATE, currentClass, entryPoints, classLocal);
 		
 		//3. onResume:
+		logger.debug("onResume");
 		Stmt onResumeStmt = new JNopStmt();
 		body.getUnits().add(onResumeStmt);
 		{
@@ -805,6 +809,7 @@ public class AndroidEntryPointCreator extends BaseEntryPointCreator implements I
 		}
 				
 		//4. onPause:
+		logger.debug("onPause");
 		Stmt onPause = searchAndBuildMethod(AndroidEntryPointConstants.ACTIVITY_ONPAUSE, currentClass, entryPoints, classLocal);
 		boolean hasAppOnPause = addCallbackMethods(applicationClass, referenceClasses,
 				AndroidEntryPointConstants.APPLIFECYCLECALLBACK_ONACTIVITYPAUSED);
@@ -823,6 +828,7 @@ public class AndroidEntryPointCreator extends BaseEntryPointCreator implements I
 		// createIfStmt(onCreateStmt);		// no, the process gets killed in between
 		
 		//5. onStop:
+		logger.debug("onStop");
 		Stmt onStop = searchAndBuildMethod(AndroidEntryPointConstants.ACTIVITY_ONSTOP, currentClass, entryPoints, classLocal);
 		boolean hasAppOnStop = addCallbackMethods(applicationClass, referenceClasses,
 				AndroidEntryPointConstants.APPLIFECYCLECALLBACK_ONACTIVITYSTOPPED);
@@ -988,7 +994,9 @@ public class AndroidEntryPointCreator extends BaseEntryPointCreator implements I
 
 		Stmt beforeCallbacks = Jimple.v().newNopStmt();
 		body.getUnits().add(beforeCallbacks);
+		int index = 0;
 		for (SootClass callbackClass : callbackClasses.keySet()) {
+			++index;
 			// If we already have a parent class that defines this callback, we
 			// use it. Otherwise, we create a new one.
 			Set<Local> classLocals = new HashSet<Local>();
@@ -1002,7 +1010,7 @@ public class AndroidEntryPointCreator extends BaseEntryPointCreator implements I
 				// if we need to call a constructor, we insert the respective Jimple statement here
 				Local classLocal = generateClassConstructor(callbackClass, body, referenceClasses);
 				if (classLocal == null) {
-					logger.warn("Constructor cannot be generated for callback class {}", callbackClass.getName());
+					logger.warn(index+"Constructor cannot be generated for callback class {}", callbackClass.getName());
 					continue;
 				}
 				classLocals.add(classLocal);

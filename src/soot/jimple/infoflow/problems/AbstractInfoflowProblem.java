@@ -63,7 +63,6 @@ public abstract class AbstractInfoflowProblem extends DefaultJimpleIFDSTabulatio
 
 	private MyConcurrentHashMap<Unit, Set<Unit>> activationUnitsToCallSites =
 			new MyConcurrentHashMap<Unit, Set<Unit>>();
-	
 	public AbstractInfoflowProblem(InfoflowManager manager) {
 		super(manager.getICFG());
 		this.manager = manager;
